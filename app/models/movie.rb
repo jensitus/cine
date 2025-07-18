@@ -17,17 +17,8 @@ class Movie < ApplicationRecord
     result = JSON.parse(file)
     result = result["result"]
     result.each do |movie_json|
-      puts "   +   +   +  movie +   +   +   +  "
-      puts movie_json["parent"]
-      puts movie_json["parent"]["id"]
-      puts movie_json["parent"]["title"]
-      puts movie_json["parent"]["uri"]
-      puts movie_json["parent"]["genres"]
-
       movie_string_id = "m-" + movie_json["parent"]["title"].downcase.gsub(" ", "-").gsub("---", "-")
-      puts movie_string_id
       movie_exists = Movie.where(movie_id: movie_string_id).exists?
-      puts movie_exists
       if movie_exists == true
         movie_created = Movie.find_by(movie_id: movie_string_id)
       else
@@ -41,17 +32,10 @@ class Movie < ApplicationRecord
           end
         end
       end
-      puts "   +   +   +   +   +   +   +  "
       movie_json["nestedResults"].each do |nested_result|
         if nested_result["parent"]["county"] == VIENNA
-          puts "   +   +   +   +   +   +   +  "
           cinema = create_cinema(nested_result["parent"])
           nested_result["screenings"].each do |screening|
-            puts screening["time"]
-            puts "3D: " + screening["3d"].to_s
-            puts screening["ov"]
-            puts screening["info"]
-            puts screening["tags"]
             schedule = create_schedule(screening, movie_created.id, cinema.id)
             if screening["tags"] != nil
               screening["tags"].each do |tag|
@@ -63,7 +47,6 @@ class Movie < ApplicationRecord
                 end
               end
             end
-
           end
         end
       end
