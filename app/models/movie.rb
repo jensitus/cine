@@ -57,7 +57,7 @@ class Movie < ApplicationRecord
               screening["tags"].each do |tag|
                 t = create_tag(tag)
                 if t != nil
-                  if schedule != nil
+                  if schedule != nil && !schedule.tags.include?(t)
                     schedule.tags.push(t)
                   end
                 end
