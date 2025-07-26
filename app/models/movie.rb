@@ -1,49 +1,93 @@
 class Movie < ApplicationRecord
+
+  require 'nokogiri'
+  require 'open-uri'
+
   has_and_belongs_to_many :genres
   has_many :schedules
   has_many :cinemas, through: :schedules
 
   VIENNA = "Wien"
+  SEVEN_DAYS = 2
+  TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5MzNjZGQ3MTcxYzUxMDZlNDQ5MjU3N2YzZjAwOGM1ZCIsIm5iZiI6MTM2NDc1NzgxNy4wLCJzdWIiOiI1MTU4OGQzOTE5YzI5NTY3NDQwZDlhYWUiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.sNb6zKWkCKY600bpUOn2WKac1GUOJW6-E-0O0PIBfjc"
 
   require "net/http"
   require "json"
 
-  def self.fetch_movie
-    # url = URI.parse("https://efs-varnish.film.at/api/v1/cfs/filmat/screenings/nested/movie/2025-06-08")
+  def self.set_date
+    date = Date.today
+    condition_date = Date.today.plus_with_duration(SEVEN_DAYS)
+    while date < condition_date do
+      url = URI.parse("https://efs-varnish.film.at/api/v1/cfs/filmat/screenings/nested/movie/" + date.to_s)
+      date = date.plus_with_duration(1)
+      fetch_movie(url)
+      # delete_old_schedules(date)
+    end
+  end
+
+  def self.delete_old_schedules(date)
+    Schedule.all.each do |schedule|
+      today = Date.today
+      if schedule.time.to_date < today
+        puts " +++ ++ ++ +"
+        puts schedule.time.to_date
+        puts today
+        schedule.delete
+      end
+    end
+  end
+
+  def self.fetch_movie(url)
+
+    date = Date.today
+    puts date
+
     # request = Net::HTTP::Get.new(url.to_s)
-    # response = Net::HTTP.get(url)
-    file = File.read("./public/movies.json")
-    # result = JSON.parse(response)
+=begin
+    file = File.read("./public/perfect.json")
     result = JSON.parse(file)
+=end
+
+    response = Net::HTTP.get(url)
+    result = JSON.parse(response)
+
     result = result["result"]
     result.each do |movie_json|
+      film_at_uri = movie_json["parent"]["uri"].gsub("/filmat", "")
       movie_string_id = "m-" + movie_json["parent"]["title"].downcase.gsub(" ", "-").gsub("---", "-")
       movie_exists = Movie.where(movie_id: movie_string_id).exists?
       if movie_exists == true
         movie_created = Movie.find_by(movie_id: movie_string_id)
+        get_additional_info_for_movie(movie_created, film_at_uri)
       else
         movie_created = Movie.create!(movie_id: movie_string_id, title: movie_json["parent"]["title"])
+        get_additional_info_for_movie(movie_created, film_at_uri)
       end
+
       if movie_json["parent"]["genres"] != nil
-        movie_json["parent"]["genres"].each do |genre_json|
-          genre = create_genre(genre_json)
-          unless movie_created.genres.include?(genre)
-            movie_created.genres.push(genre)
-          end
-        end
+        create_genres(movie_json["parent"]["genres"], movie_created)
       end
-      movie_json["nestedResults"].each do |nested_result|
-        if nested_result["parent"]["county"] == VIENNA
-          cinema = create_cinema(nested_result["parent"])
-          nested_result["screenings"].each do |screening|
-            schedule = create_schedule(screening, movie_created.id, cinema.id)
-            if screening["tags"] != nil
-              screening["tags"].each do |tag|
-                t = create_tag(tag)
-                if t != nil
-                  if schedule != nil && !schedule.tags.include?(t)
-                    schedule.tags.push(t)
-                  end
+
+      get_cinema_and_schedule(movie_json, movie_created.id)
+
+    end
+
+  end
+
+  private
+
+  def self.get_cinema_and_schedule(movie_json, movie_id)
+    movie_json["nestedResults"].each do |nested_result|
+      if nested_result["parent"]["county"] == VIENNA
+        cinema = create_cinema(nested_result["parent"])
+        nested_result["screenings"].each do |screening|
+          schedule = create_schedule(screening, movie_id, cinema.id)
+          if screening["tags"] != nil
+            screening["tags"].each do |tag|
+              t = create_tag(tag)
+              if t != nil
+                if schedule != nil && !schedule.tags.include?(t)
+                  schedule.tags.push(t)
                 end
               end
             end
@@ -51,10 +95,126 @@ class Movie < ApplicationRecord
         end
       end
     end
-
   end
 
-  private
+  def self.create_genres(genres, movie_created)
+    genres.each do |genre_json|
+      genre = create_genre(genre_json)
+      unless movie_created.genres.include?(genre)
+        movie_created.genres.push(genre)
+      end
+    end
+  end
+
+  def self.get_additional_info(uri)
+    docs = nil
+    begin
+      docs = Nokogiri::HTML(URI.open("https://film.at" + uri))
+    rescue OpenURI::HTTPError => error
+      Rails.logger.error error.message
+    end
+    docs
+  end
+
+  def self.get_additional_info_for_movie(movie, uri)
+    docs = get_additional_info(uri)
+    if docs != nil
+
+      movie_query_string = get_movie_querystring(docs, movie.title)
+      puts movie_query_string
+      puts "_______________________"
+
+      docs.css('article div p span.release').each do |link|
+        additional_info = link.content.gsub(" ", "").split(",")
+        year = additional_info[-1].gsub("\n", "")
+        additional_info.delete_at(-1)
+        countries = additional_info.join(", ")
+        country_string = countries.chomp(', ').gsub("\n", "")
+        movie.update(countries: country_string, year: year)
+        tmdb_id = get_tmdb_id(movie_query_string, year)
+        if tmdb_id != nil
+          description = get_additional_info_from_tmdb(tmdb_id.to_s, "overview")
+          poster_path = get_additional_info_from_tmdb(tmdb_id.to_s, "poster_path")
+        end
+        movie.update(tmdb_id: tmdb_id) unless tmdb_id == nil
+        movie.update(description: description) unless description == nil
+        movie.update(poster_path: poster_path) unless poster_path == nil
+      end
+
+    end
+  end
+
+  def self.get_movie_querystring(docs, movie_title_json)
+    movie_query_string = nil
+    docs.css('article div p span.ov-title').each do |link|
+      movie_query_string = link.content
+    end
+    if movie_query_string == nil || movie_query_string == ""
+      movie_query_string = movie_title_json
+    end
+    change_umlaut_to_vowel(movie_query_string)
+  end
+
+  def self.get_additional_info_from_tmdb(tmdb_id, kind_of_info)
+    url = URI("https://api.themoviedb.org/3/movie/" + tmdb_id + "?language=de-DE&region=DE")
+    tmdb_results = get_tmdb_results(url)
+    additional_info = tmdb_results["#{kind_of_info}"]
+    additional_info
+  end
+
+  def self.get_tmdb_id(movie_title, year)
+    begin
+      url = URI("https://api.themoviedb.org/3/search/movie?query=" + movie_title + "&language=de-DE&region=DE")
+    rescue URI::InvalidURIError
+      Rails.logger.error 'invalid uri'
+    end
+    tmdb_results = get_tmdb_results(url)
+    potential_id = nil
+
+    if tmdb_results != nil
+      tmdb_results["results"].each do |tmdb_result|
+        original_title = tmdb_result["original_title"]
+        if movie_title.eql? tmdb_result["original_title"] or movie_title.downcase.eql?(tmdb_result["original_title"].downcase)
+          release_date = tmdb_result["release_date"]
+          if release_date != nil
+            if release_date.to_date != nil
+              release_year = release_date.to_date.strftime("%Y")
+            end
+          end
+        end
+        if original_title == movie_title && release_year == year
+          potential_id = tmdb_result['id']
+        elsif original_title == movie_title && year.to_i == release_year.to_i + 1
+          potential_id = tmdb_result['id']
+        elsif original_title == movie_title && year.to_i == release_year.to_i - 1
+          potential_id = tmdb_result['id']
+        else
+          puts false
+        end
+      end
+    end
+    potential_id
+  end
+
+  def self.change_umlaut_to_vowel(querystring)
+    querystring.downcase.gsub("ä", "a").gsub("ö", "o").gsub("ü", "u").gsub("ß", "ss")
+  end
+
+  def self.get_tmdb_results(url)
+    begin
+      http = Net::HTTP.new(url.host, url.port)
+      http.use_ssl = true if url.scheme == 'https'
+      request = Net::HTTP::Get.new(url)
+      request['Content-Type'] = 'application/json'
+      request['Authorization'] = "Bearer #{TOKEN}"
+      response = http.request(request)
+      tmdb_results = JSON.parse(response.body)
+      return tmdb_results
+    rescue NoMethodError
+      Rails.logger.error 'no method error, because of invalid URI'
+    end
+    return nil
+  end
 
   def self.create_genre(genre_name)
     genre_id = "g-" + genre_name.downcase.gsub(" ", "-")
@@ -71,13 +231,26 @@ class Movie < ApplicationRecord
     theater_id = "t-" + cinema["title"].gsub(" ", "-").downcase
     if Cinema.where(cinema_id: theater_id).exists? == false
       cinema_created = Cinema.create!(title: cinema["title"],
-                                      county: cinemal["county"],
-                                      uri: cinema["uri"],
+                                      county: cinema["county"],
+                                      uri: get_cinema_url(cinema["uri"].gsub("/filmat", "")),
                                       cinema_id: theater_id)
     else
       cinema_created = Cinema.find_by(cinema_id: theater_id)
     end
     cinema_created
+  end
+
+  def self.get_cinema_url(uri)
+    cinema_url = nil
+    docs = get_additional_info(uri)
+    if docs != nil
+      docs.css('main div section div div p a').each do |link|
+        if link.content.start_with?("http")
+          cinema_url = link.content
+        end
+      end
+    end
+    return cinema_url
   end
 
   def self.create_schedule(screening, movie_id, cinema_id)

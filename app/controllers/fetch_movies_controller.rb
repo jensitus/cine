@@ -1,5 +1,5 @@
 class FetchMoviesController < ApplicationController
   def get
-    Movie.fetch_movie
+    Movie.set_date
   end
 end

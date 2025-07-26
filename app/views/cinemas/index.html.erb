@@ -1,16 +1,18 @@
-<p style="color: green"><%= notice %></p>
+<div class="container">
+  <p style="color: green"><%= notice %></p>
 
-<% content_for :title, "Cinemas" %>
+  <% content_for :title, "Cinemas" %>
 
-<h1>Cinemas</h1>
+  <h1>Cinemas</h1>
 
-<div id="cinemas">
-  <% @cinemas.each do |cinema| %>
-    <%= render cinema %>
-    <p>
-      <%= link_to "Show this cinema", cinema %>
-    </p>
-  <% end %>
+  <div id="cinemas">
+    <% @cinemas.each do |cinema| %>
+      <%= render cinema %>
+      <p>
+        <%= link_to "Show this cinema", cinema %>
+      </p>
+    <% end %>
+  </div>
+
+  <%= link_to "New cinema", new_cinema_path %>
 </div>
-
-<%= link_to "New cinema", new_cinema_path %>

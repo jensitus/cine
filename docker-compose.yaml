@@ -1,0 +1,23 @@
+
+services:
+  web:
+    build: .
+    command: bundle exec rails s -p 3000 -b '0.0.0.0'
+    volumes:
+      - .:/web
+    ports:
+      - "3000:3000"
+
+  postgres:
+    image: postgres:15.10-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: cine
+      POSTGRES_PASSWORD: cine
+      POSTGRES_USER: cine
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+
+volumes:
+  pg-data:
