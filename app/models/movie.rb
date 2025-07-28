@@ -8,7 +8,7 @@ class Movie < ApplicationRecord
   has_many :cinemas, through: :schedules
 
   VIENNA = "Wien"
-  SEVEN_DAYS = 2
+  SEVEN_DAYS = 4
   TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5MzNjZGQ3MTcxYzUxMDZlNDQ5MjU3N2YzZjAwOGM1ZCIsIm5iZiI6MTM2NDc1NzgxNy4wLCJzdWIiOiI1MTU4OGQzOTE5YzI5NTY3NDQwZDlhYWUiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.sNb6zKWkCKY600bpUOn2WKac1GUOJW6-E-0O0PIBfjc"
 
   require "net/http"
@@ -21,18 +21,24 @@ class Movie < ApplicationRecord
       url = URI.parse("https://efs-varnish.film.at/api/v1/cfs/filmat/screenings/nested/movie/" + date.to_s)
       date = date.plus_with_duration(1)
       fetch_movie(url)
-      # delete_old_schedules(date)
     end
+    delete_old_schedules(date)
+    delete_movies_without_schedules
   end
 
   def self.delete_old_schedules(date)
     Schedule.all.each do |schedule|
       today = Date.today
       if schedule.time.to_date < today
-        puts " +++ ++ ++ +"
-        puts schedule.time.to_date
-        puts today
         schedule.delete
+      end
+    end
+  end
+
+  def self.delete_movies_without_schedules
+    Movie.all.each do |movie|
+      if movie.schedules.empty?
+        movie.delete
       end
     end
   end
@@ -44,7 +50,7 @@ class Movie < ApplicationRecord
 
     # request = Net::HTTP::Get.new(url.to_s)
 =begin
-    file = File.read("./public/perfect.json")
+    file = File.read("./public/knochenmann.json")
     result = JSON.parse(file)
 =end
 
@@ -55,26 +61,27 @@ class Movie < ApplicationRecord
     result.each do |movie_json|
       film_at_uri = movie_json["parent"]["uri"].gsub("/filmat", "")
       movie_string_id = "m-" + movie_json["parent"]["title"].downcase.gsub(" ", "-").gsub("---", "-")
-      movie_exists = Movie.where(movie_id: movie_string_id).exists?
-      if movie_exists == true
-        movie_created = Movie.find_by(movie_id: movie_string_id)
-        get_additional_info_for_movie(movie_created, film_at_uri)
-      else
-        movie_created = Movie.create!(movie_id: movie_string_id, title: movie_json["parent"]["title"])
-        get_additional_info_for_movie(movie_created, film_at_uri)
-      end
-
+      movie_created = find_or_create_movie(movie_string_id, film_at_uri, movie_json["parent"]["title"])
       if movie_json["parent"]["genres"] != nil
         create_genres(movie_json["parent"]["genres"], movie_created)
       end
-
       get_cinema_and_schedule(movie_json, movie_created.id)
-
     end
-
   end
 
   private
+
+  def self.find_or_create_movie(movie_string_id, film_at_uri, movie_title)
+    movie_exists = Movie.where(movie_id: movie_string_id).exists?
+    if movie_exists == true
+      movie_created = Movie.find_by(movie_id: movie_string_id)
+      get_additional_info_for_movie(movie_created, film_at_uri)
+    else
+      movie_created = Movie.create!(movie_id: movie_string_id, title: movie_title)
+      get_additional_info_for_movie(movie_created, film_at_uri)
+    end
+    movie_created
+  end
 
   def self.get_cinema_and_schedule(movie_json, movie_id)
     movie_json["nestedResults"].each do |nested_result|
@@ -121,8 +128,7 @@ class Movie < ApplicationRecord
     if docs != nil
 
       movie_query_string = get_movie_querystring(docs, movie.title)
-      puts movie_query_string
-      puts "_______________________"
+      puts movie_query_string.inspect
 
       docs.css('article div p span.release').each do |link|
         additional_info = link.content.gsub(" ", "").split(",")
@@ -135,6 +141,9 @@ class Movie < ApplicationRecord
         if tmdb_id != nil
           description = get_additional_info_from_tmdb(tmdb_id.to_s, "overview")
           poster_path = get_additional_info_from_tmdb(tmdb_id.to_s, "poster_path")
+          credits = get_cast(tmdb_id.to_s)
+          set_cast_to_movie(movie, credits["cast"])
+          set_crew_to_movie(movie, credits["crew"])
         end
         movie.update(tmdb_id: tmdb_id) unless tmdb_id == nil
         movie.update(description: description) unless description == nil
@@ -142,6 +151,26 @@ class Movie < ApplicationRecord
       end
 
     end
+  end
+
+  def self.set_cast_to_movie(movie, cast)
+    actors = ""
+    cast.each do |c|
+      if c["known_for_department"] == "Acting"
+        actors << c["name"] + ", "
+      end
+    end
+    movie.update(actors: actors.chomp(", "))
+  end
+
+  def self.set_crew_to_movie(movie, crew)
+    director = ""
+    crew.each do |c|
+      if c["known_for_department"] == "Directing" and c["job"] == "Director"
+        director << c["name"] + ", "
+      end
+    end
+    movie.update(director: director.chomp(", "))
   end
 
   def self.get_movie_querystring(docs, movie_title_json)
@@ -163,6 +192,9 @@ class Movie < ApplicationRecord
   end
 
   def self.get_tmdb_id(movie_title, year)
+    puts "+ + + + + + + + + + + + "
+    puts movie_title
+    puts year
     begin
       url = URI("https://api.themoviedb.org/3/search/movie?query=" + movie_title + "&language=de-DE&region=DE")
     rescue URI::InvalidURIError
@@ -170,10 +202,11 @@ class Movie < ApplicationRecord
     end
     tmdb_results = get_tmdb_results(url)
     potential_id = nil
+    puts tmdb_results.inspect
 
     if tmdb_results != nil
       tmdb_results["results"].each do |tmdb_result|
-        original_title = tmdb_result["original_title"]
+        original_title = tmdb_result["original_title"].downcase
         if movie_title.eql? tmdb_result["original_title"] or movie_title.downcase.eql?(tmdb_result["original_title"].downcase)
           release_date = tmdb_result["release_date"]
           if release_date != nil
@@ -182,6 +215,11 @@ class Movie < ApplicationRecord
             end
           end
         end
+        puts "original_title " + original_title
+        puts "movie_title " + movie_title
+        puts "release_year " + release_year.inspect
+        puts "year " + year
+        puts " h i m m e l "
         if original_title == movie_title && release_year == year
           potential_id = tmdb_result['id']
         elsif original_title == movie_title && year.to_i == release_year.to_i + 1
@@ -191,13 +229,22 @@ class Movie < ApplicationRecord
         else
           puts false
         end
+        puts "potential_id inside loop: #{potential_id}"
       end
     end
+    puts "potential_id outside loop: #{potential_id}"
     potential_id
   end
 
   def self.change_umlaut_to_vowel(querystring)
     querystring.downcase.gsub("ä", "a").gsub("ö", "o").gsub("ü", "u").gsub("ß", "ss")
+  end
+
+  def self.get_cast(tmdb_id)
+    url = URI("https://api.themoviedb.org/3/movie/#{tmdb_id}/credits")
+    puts url
+    tmdb_results = get_tmdb_results(url)
+    tmdb_results
   end
 
   def self.get_tmdb_results(url)

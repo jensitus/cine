@@ -9,9 +9,20 @@
       <%= movie.title %>
     </strong>
   </div>
+  <div class="mt-2 mb-2">
+    <%= movie.countries %> <%= movie.year %>
+    <% movie.genres.each do |genre| %>
+      <%= genre.name %>
+    <% end %>
+  </div>
 
   <div>
     <%= movie.description %>
+  </div>
+
+  <div class="mt-2 mb-2 small">
+    <%= "D: " +  movie.director unless movie.director == nil %> <br>
+    <%= "A: " + movie.actors unless movie.actors == nil %>
   </div>
 
 </div>

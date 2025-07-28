@@ -6,10 +6,17 @@
       <h1>Movies</h1>
       <div id="movies">
         <% @movies.each do |movie| %>
-          <%= render movie %>
-          <p>
-            <%= link_to "Show this movie", movie %>
-          </p>
+          <div class="row mt-2">
+            <div class="col">
+              <% if movie.poster_path != nil %>
+                <%= image_tag("https://image.tmdb.org/t/p/w500" + movie.poster_path, width: "10%", class: "float-start me-3")  %>
+              <% end %>
+              <%= movie.title %>
+              <p>
+                <%= link_to "Show this movie", movie %>
+              </p>
+            </div>
+          </div>
         <% end %>
       </div>
     </div>
