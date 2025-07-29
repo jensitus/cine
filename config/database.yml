@@ -5,12 +5,15 @@
 #   gem "sqlite3"
 #
 default: &default
-  adapter: sqlite3
+  adapter: postgresql
+  encoding: unicode
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
   timeout: 5000
 
 development:
-  <<: *default
+  adapter: sqlite3
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  timeout: 5000
   database: storage/development.sqlite3
 
 # Warning: The database defined as "test" will be erased and
@@ -26,14 +29,19 @@ test:
 production:
   primary:
     <<: *default
-    database: storage/production.sqlite3
+    database: cine_production
+    username: cine
+    password: <%= ENV['CINE_DATABASE_PASSWORD'] %>
+    url: <%= ENV['DATABASE_URL'] %>
+    host: <%= ENV['DB_HOST'] %>
+    port: <%= ENV['DB_PORT'] %>
   cache:
     <<: *default
-    database: storage/production_cache.sqlite3
+    database: cine_production_cache
     migrations_paths: db/cache_migrate
   queue:
     <<: *default
-    database: storage/production_queue.sqlite3
+    database: cine_production_queue
     migrations_paths: db/queue_migrate
   cable:
     <<: *default
