@@ -31,7 +31,7 @@ production:
     <<: *default
     database: cine_production
     username: cine
-    password: <%= ENV['CINE_DATABASE_PASSWORD'] %>
+    password: <%= ENV['POSTGRES_PASSWORD'] %>
     url: <%= ENV['DATABASE_URL'] %>
     host: <%= ENV['DB_HOST'] %>
     port: <%= ENV['DB_PORT'] %>

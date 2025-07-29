@@ -101,8 +101,8 @@ accessories:
     env:
       clear:
         POSTGRES_USER: cine
-#       secret:
-#         - MYSQL_ROOT_PASSWORD
+      secret:
+        - POSTGRES_PASSWORD
 #     files:
 #       - config/mysql/production.cnf:/etc/mysql/my.cnf
 #       - db/production.sql:/docker-entrypoint-initdb.d/setup.sql
