@@ -33,10 +33,6 @@ registry:
 
 # Inject ENV variables into containers (secrets come from .kamal/secrets).
 env:
-  POSTGRES_USER: cine
-  POSTGRES_DB: cine_production
-  DB_HOST: 127.0.0.1
-  DB_PORT: 5432
   secret:
     - RAILS_MASTER_KEY
     - POSTGRES_PASSWORD
@@ -54,6 +50,10 @@ env:
     # Match this to any external database server to configure Active Record correctly
     # Use cine-db for a db accessory server on same machine via local kamal docker network.
     # DB_HOST: 192.168.0.2
+    POSTGRES_USER: cine
+    POSTGRES_DB: cine_production
+    DB_HOST: 127.0.0.1
+    DB_PORT: 5432
 
     # Log everything from Rails
     # RAILS_LOG_LEVEL: debug
