@@ -101,8 +101,15 @@ accessories:
     env:
       clear:
         POSTGRES_USER: cine
+        POSTGRES_DB: cine_production
+        DB_HOST: 127.0.0.1
+        DB_PORT: 5432
       secret:
         - POSTGRES_PASSWORD
+    directories:
+      - data:/var/lib/postgresql/data
+    files:
+      - db/production_setup.sql:/docker-entrypoint-initdb.d/setup.sql
 #     files:
 #       - config/mysql/production.cnf:/etc/mysql/my.cnf
 #       - db/production.sql:/docker-entrypoint-initdb.d/setup.sql
