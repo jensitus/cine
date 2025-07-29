@@ -29,10 +29,9 @@ test:
 production:
   primary:
     <<: *default
-    database: cine_production
-    username: cine
+    database: <%= ENV['POSTGRES_USER'] %>
+    username: <%= ENV['POSTGRES_DB'] %>
     password: <%= ENV['POSTGRES_PASSWORD'] %>
-    url: <%= ENV['DATABASE_URL'] %>
     host: <%= ENV['DB_HOST'] %>
     port: <%= ENV['DB_PORT'] %>
   cache:
