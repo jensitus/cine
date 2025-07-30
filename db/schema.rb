@@ -11,6 +11,9 @@
 # It's strongly recommended that you check this file into your version control system.
 
 ActiveRecord::Schema[8.0].define(version: 2025_07_25_074348) do
+  # These are extensions that must be enabled in order to support this database
+  enable_extension "pg_catalog.plpgsql"
+
   create_table "cinemas", force: :cascade do |t|
     t.string "cinema_id", null: false
     t.string "title"
@@ -22,8 +25,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_25_074348) do
   end
 
   create_table "cinemas_tags", force: :cascade do |t|
-    t.integer "cinema_id"
-    t.integer "tag_id"
+    t.bigint "cinema_id"
+    t.bigint "tag_id"
     t.index ["cinema_id", "tag_id"], name: "index_cinemas_tags_on_cinema_id_and_tag_id", unique: true
     t.index ["cinema_id"], name: "index_cinemas_tags_on_cinema_id"
     t.index ["tag_id"], name: "index_cinemas_tags_on_tag_id"
@@ -38,8 +41,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_25_074348) do
   end
 
   create_table "genres_movies", id: false, force: :cascade do |t|
-    t.integer "movie_id", null: false
-    t.integer "genre_id", null: false
+    t.bigint "movie_id", null: false
+    t.bigint "genre_id", null: false
     t.index ["movie_id", "genre_id"], name: "index_genres_movies_on_movie_id_and_genre_id", unique: true
   end
 
@@ -59,8 +62,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_25_074348) do
   end
 
   create_table "movies_genres", force: :cascade do |t|
-    t.integer "genre_id"
-    t.integer "movie_id"
+    t.bigint "genre_id"
+    t.bigint "movie_id"
     t.index ["genre_id"], name: "index_movies_genres_on_genre_id"
     t.index ["movie_id", "genre_id"], name: "index_movies_genres_on_movie_id_and_genre_id", unique: true
     t.index ["movie_id"], name: "index_movies_genres_on_movie_id"
@@ -71,8 +74,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_25_074348) do
     t.boolean "three_d"
     t.boolean "ov"
     t.string "info"
-    t.integer "movie_id"
-    t.integer "cinema_id"
+    t.bigint "movie_id"
+    t.bigint "cinema_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "schedule_id"
@@ -82,8 +85,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_07_25_074348) do
   end
 
   create_table "schedules_tags", id: false, force: :cascade do |t|
-    t.integer "tag_id", null: false
-    t.integer "schedule_id", null: false
+    t.bigint "tag_id", null: false
+    t.bigint "schedule_id", null: false
     t.index ["tag_id", "schedule_id"], name: "index_schedules_tags_on_tag_id_and_schedule_id", unique: true
   end
 
