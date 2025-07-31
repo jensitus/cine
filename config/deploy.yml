@@ -53,7 +53,7 @@ env:
     POSTGRES_USER: cine
     POSTGRES_DB: cine_production
     DB_HOST: cine-db
-    DB_PORT: 5432
+    # DB_PORT: 5432
 
     # Log everything from Rails
     RAILS_LOG_LEVEL: debug
