@@ -1,0 +1,4 @@
+CREATE DATABASE cine_production;
+CREATE DATABASE cine_production_cache;
+CREATE DATABASE cine_production_queue;
+CREATE DATABASE cine_production_cable;
