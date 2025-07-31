@@ -38,6 +38,7 @@ production:
     password: <%= ENV['POSTGRES_PASSWORD'] %>
     host: <%= ENV['DB_HOST'] %>
     port: <%= ENV['DB_PORT'] %>
+    url: <%= ENV["DATABASE_URL"] %>
   cache:
     <<: *default
     database: cine_production_cache
