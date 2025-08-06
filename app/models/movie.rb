@@ -2,17 +2,16 @@ class Movie < ApplicationRecord
 
   require 'nokogiri'
   require 'open-uri'
+  require "net/http"
+  require "json"
 
   has_and_belongs_to_many :genres
   has_many :schedules
   has_many :cinemas, through: :schedules
 
   VIENNA = "Wien"
-  SEVEN_DAYS = 4
+  SEVEN_DAYS = 3
   TOKEN = Rails.configuration.tmdb_token
-
-  require "net/http"
-  require "json"
 
   def self.set_date
     date = Date.today
@@ -45,12 +44,8 @@ class Movie < ApplicationRecord
 
   def self.fetch_movie(url)
 
-    date = Date.today
-    puts date
-
-    # request = Net::HTTP::Get.new(url.to_s)
 =begin
-    file = File.read("./public/knochenmann.json")
+    file = File.read("./public/perfect.json")
     result = JSON.parse(file)
 =end
 
@@ -75,7 +70,10 @@ class Movie < ApplicationRecord
     movie_exists = Movie.where(movie_id: movie_string_id).exists?
     if movie_exists == true
       movie_created = Movie.find_by(movie_id: movie_string_id)
-      get_additional_info_for_movie(movie_created, film_at_uri)
+      tmdb_id = movie_created.tmdb_id
+      if movie_created.tmdb_id.nil?
+        get_additional_info_for_movie(movie_created, film_at_uri)
+      end
     else
       movie_created = Movie.create!(movie_id: movie_string_id, title: movie_title)
       get_additional_info_for_movie(movie_created, film_at_uri)
@@ -127,8 +125,7 @@ class Movie < ApplicationRecord
     docs = get_additional_info(uri)
     if docs != nil
 
-      movie_query_string = get_movie_querystring(docs, movie.title)
-      puts movie_query_string.inspect
+      movie_query_title = get_movie_query_title(docs, movie.title)
 
       docs.css('article div p span.release').each do |link|
         additional_info = link.content.gsub(" ", "").split(",")
@@ -137,7 +134,7 @@ class Movie < ApplicationRecord
         countries = additional_info.join(", ")
         country_string = countries.chomp(', ').gsub("\n", "")
         movie.update(countries: country_string, year: year)
-        tmdb_id = get_tmdb_id(movie_query_string, year)
+        tmdb_id = get_movie_query_tmdb_url_and_further_get_tmdb_id(movie_query_title, movie.title, year)
         if tmdb_id != nil
           description = get_additional_info_from_tmdb(tmdb_id.to_s, "overview")
           poster_path = get_additional_info_from_tmdb(tmdb_id.to_s, "poster_path")
@@ -149,7 +146,16 @@ class Movie < ApplicationRecord
         movie.update(description: description) unless description == nil
         movie.update(poster_path: poster_path) unless poster_path == nil
       end
+    end
+  end
 
+  def self.create_url_tmdb_id(movie_query_string)
+    begin
+      url = URI("https://api.themoviedb.org/3/search/movie?query=" + movie_query_string + "&language=de-DE&region=DE")
+      return url
+    rescue URI::InvalidURIError
+      Rails.logger.error 'invalid uri'
+      return nil
     end
   end
 
@@ -173,15 +179,24 @@ class Movie < ApplicationRecord
     movie.update(director: director.chomp(", "))
   end
 
-  def self.get_movie_querystring(docs, movie_title_json)
-    movie_query_string = nil
+  def self.get_movie_query_title(docs, movie_title_json)
+    movie_query_title = nil
     docs.css('article div p span.ov-title').each do |link|
-      movie_query_string = link.content
+      movie_query_title = link.content
     end
-    if movie_query_string == nil || movie_query_string == ""
-      movie_query_string = movie_title_json
+    if movie_query_title.nil? or movie_query_title == ""
+      movie_query_title = movie_title_json
     end
-    change_umlaut_to_vowel(movie_query_string)
+    return movie_query_title
+  end
+
+  def self.get_movie_query_tmdb_url_and_further_get_tmdb_id(movie_query_title, movie_title_json, year)
+    query_string = change_umlaut_to_vowel(movie_query_title)
+    if create_url_tmdb_id(query_string).nil?
+      query_string = change_umlaut_to_vowel(movie_title_json)
+    end
+    tmdb_query_url = create_url_tmdb_id(query_string)
+    return get_tmdb_id(tmdb_query_url, year, query_string, movie_title_json)
   end
 
   def self.get_additional_info_from_tmdb(tmdb_id, kind_of_info)
@@ -191,53 +206,69 @@ class Movie < ApplicationRecord
     additional_info
   end
 
-  def self.get_tmdb_id(movie_title, year)
-    puts "+ + + + + + + + + + + + "
-    puts movie_title
-    puts year
-    begin
-      url = URI("https://api.themoviedb.org/3/search/movie?query=" + movie_title + "&language=de-DE&region=DE")
-    rescue URI::InvalidURIError
-      Rails.logger.error 'invalid uri'
-    end
+  def self.get_tmdb_id(url, year, movie_query_title, movie_title_json)
     tmdb_results = get_tmdb_results(url)
-    potential_id = nil
-    puts tmdb_results.inspect
+    presumable_tmdb_id = nil
 
     if tmdb_results != nil
       tmdb_results["results"].each do |tmdb_result|
-        original_title = tmdb_result["original_title"].downcase
-        if movie_title.eql? tmdb_result["original_title"] or movie_title.downcase.eql?(tmdb_result["original_title"].downcase)
-          release_date = tmdb_result["release_date"]
-          if release_date != nil
-            if release_date.to_date != nil
-              release_year = release_date.to_date.strftime("%Y")
-            end
-          end
+        tmdb_original_title = change_umlaut_to_vowel(tmdb_result["original_title"].downcase)
+        tmdb_title = change_umlaut_to_vowel(tmdb_result["title"].downcase)
+        if movie_query_title.eql?(tmdb_original_title) or tmdb_title.eql?(movie_query_title)
+          tmdb_release_year = get_tmdb_release_year(tmdb_result)
         end
-        puts "original_title " + original_title
-        puts "movie_title " + movie_title
-        puts "release_year " + release_year.inspect
-        puts "year " + year
-        puts " h i m m e l "
-        if original_title == movie_title && release_year == year
-          potential_id = tmdb_result['id']
-        elsif original_title == movie_title && year.to_i == release_year.to_i + 1
-          potential_id = tmdb_result['id']
-        elsif original_title == movie_title && year.to_i == release_year.to_i - 1
-          potential_id = tmdb_result['id']
+        if tmdb_original_title == movie_query_title && tmdb_release_year == year
+          presumable_tmdb_id = tmdb_result['id']
+        elsif tmdb_original_title == movie_query_title && year.to_i == tmdb_release_year.to_i + 1
+          presumable_tmdb_id = tmdb_result['id']
+        elsif tmdb_original_title == movie_query_title && year.to_i == tmdb_release_year.to_i - 1
+          presumable_tmdb_id = tmdb_result['id']
+        elsif tmdb_original_title != movie_query_title and tmdb_title.eql?(movie_query_title) and year.to_i == tmdb_release_year.to_i
+          presumable_tmdb_id = tmdb_result['id']
+        elsif tmdb_original_title != movie_query_title and tmdb_title.eql?(change_umlaut_to_vowel(movie_title_json))
+          tmdb_release_year = get_tmdb_release_year(tmdb_result)
+          if year.to_i == tmdb_release_year.to_i
+            presumable_tmdb_id = tmdb_result['id']
+          end
         else
           puts false
         end
-        puts "potential_id inside loop: #{potential_id}"
       end
     end
-    puts "potential_id outside loop: #{potential_id}"
-    potential_id
+    if presumable_tmdb_id.nil? and !tmdb_results.nil? and tmdb_results["results"].length == 1
+      presumable_tmdb_id = the_other_way_around(tmdb_results["results"].first["id"], movie_title_json, year)
+    end
+    return presumable_tmdb_id
+  end
+
+  def self.get_tmdb_release_year(tmdb_result)
+    tmdb_release_date = tmdb_result["release_date"]
+    if tmdb_release_date != nil
+      if tmdb_release_date.to_date != nil
+        tmdb_release_year = tmdb_release_date.to_date.strftime("%Y")
+      end
+    end
+    return tmdb_release_year
+  end
+
+  def self.the_other_way_around(tmdb_id, movie_title, year)
+    url = URI("https://api.themoviedb.org/3/movie/" + tmdb_id.to_s + "?language=de-DE&region=DE")
+    tmdb_results = get_tmdb_results(url)
+    puts tmdb_results.inspect
+    tmdb_release_year = get_tmdb_release_year(tmdb_results)
+    if !change_umlaut_to_vowel(movie_title).eql?(change_umlaut_to_vowel(tmdb_results["title"]))
+      tmdb_id = nil
+    elsif change_umlaut_to_vowel(movie_title).eql?(change_umlaut_to_vowel(tmdb_results["title"]))
+      if !tmdb_release_year == year
+        tmdb_id = nil
+      end
+    end
+    return tmdb_id
   end
 
   def self.change_umlaut_to_vowel(querystring)
-    querystring.downcase.gsub("ä", "a").gsub("ö", "o").gsub("ü", "u").gsub("ß", "ss")
+    q = I18n.transliterate(querystring).downcase.gsub("ä", "a").gsub("ö", "o").gsub("ü", "u").gsub("ß", "ss").gsub(" -", "").gsub(":", "").gsub("'", "")
+    querystring = q
   end
 
   def self.get_cast(tmdb_id)
