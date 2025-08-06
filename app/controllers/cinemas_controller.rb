@@ -20,13 +20,13 @@ class CinemasController < ApplicationController
 
   # Only allow a list of trusted parameters through.
   def cinema_params
-    params.expect(cinema: [:cinema_id, :title, :county, :uri])
+    params.expect(cinema: [ :cinema_id, :title, :county, :uri ])
   end
 
   def set_cinema_schedules
     @cinema_schedules =
       @cinema.schedules
-             .group_by { |schedule| Time.at(schedule.time).strftime('%d.%m.') }
+             .group_by { |schedule| Time.at(schedule.time).strftime("%d.%m.") }
              .collect { |timeslot, schedule| [timeslot, Hash[schedule.group_by { |s| s.movie.title }]] }
   end
 
