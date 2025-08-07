@@ -37,10 +37,10 @@ gem "kamal", require: false
 # Add HTTP asset caching/compression and X-Sendfile acceleration to Puma [https://github.com/basecamp/thruster/]
 gem "thruster", require: false
 
-gem 'dartsass-rails'
-gem 'bootstrap', '~> 5.3.3'
+gem "dartsass-rails"
+gem "bootstrap", "~> 5.3.3"
 
-gem 'nokogiri'
+gem "nokogiri"
 
 gem "pg"
 
@@ -57,7 +57,7 @@ group :development, :test do
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
 
-  gem 'dotenv'
+  gem "dotenv"
 
 end
 
