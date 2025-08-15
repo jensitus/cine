@@ -30,6 +30,15 @@ threads threads_count, threads_count
 # Specifies the `port` that Puma will listen on to receive requests; default is 3000.
 port ENV.fetch("PORT", 3000)
 
+# Min and Max threads per worker
+workers 2
+threads 1, 6
+app_dir    = File.expand_path('../..', __FILE__)
+shared_dir = "#{app_dir}/shared"
+
+# Set up socket location
+bind "unix://#{shared_dir}/sockets/puma.sock"
+
 # Allow puma to be restarted by `bin/rails restart` command.
 plugin :tmp_restart
 
