@@ -7,7 +7,7 @@ image: jensitus/cine
 # Deploy to these servers.
 servers:
   web:
-    - 195.201.90.139
+    - 168.119.167.130
   # job:
   #   hosts:
   #     - 192.168.0.1
@@ -100,7 +100,7 @@ builder:
 accessories:
   db:
     image: postgres:15
-    host: 195.201.90.139
+    host: 168.119.167.130
     # Change to 3306 to expose port to the world instead of just local network.
     port: 5432
     env:

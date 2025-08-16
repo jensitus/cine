@@ -10,7 +10,7 @@ class Movie < ApplicationRecord
   has_many :cinemas, through: :schedules
 
   VIENNA = "Wien"
-  SEVEN_DAYS = 7
+  SEVEN_DAYS = 3
   TOKEN = Rails.configuration.tmdb_token
 
   def self.set_date

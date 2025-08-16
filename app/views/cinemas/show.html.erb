@@ -23,7 +23,9 @@
                   <br>
                   <% schedule.each do |schedule_value| %>
                     <%= schedule_value.time.in_time_zone("Vienna").strftime("%H:%M") %>
-                    <%= schedule_value.info %>
+                    <span class="text-secondary small">
+                      <%= schedule_value.info %>
+                    </span>
                   <% end %>
                 </div>
               </div>
