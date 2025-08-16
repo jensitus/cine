@@ -31,10 +31,10 @@ threads threads_count, threads_count
 port ENV.fetch("PORT", 3000)
 
 # Min and Max threads per worker
-workers 2
-threads 1, 6
-app_dir    = File.expand_path('../..', __FILE__)
-shared_dir = "#{app_dir}/shared"
+# workers 2
+# threads 1, 6
+# app_dir    = File.expand_path('../..', __FILE__)
+# shared_dir = "#{app_dir}/shared"
 
 # Set up socket location
 bind "unix://#{shared_dir}/sockets/puma.sock"
